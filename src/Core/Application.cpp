@@ -6,6 +6,10 @@
 #include "BSAEngine/Renderer/Shader.h"
 #include "BSAEngine/Renderer/PerspectiveCamera.h"
 #include "BSAEngine/Renderer/Framebuffer.h"
+#include "BSAEngine/Scene/Scene.h"
+#include "BSAEngine/Scene/Entity.h"
+#include "BSAEngine/Scene/Components.h"
+#include "BSAEngine/Scene/ScriptableEntity.h"
 #include "BSAEngine/Math/Math.h"
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
@@ -13,6 +17,28 @@
 namespace BSA {
 
     Application* Application::s_Instance = nullptr;
+
+    // --- GEÇİCİ SANDBOX NATIVE SCRIPT ORNEGI ---
+    // Küpü kendi ekseni etrafinda donduren oyun davranisi (Script)
+    class CubeController : public BSA::ScriptableEntity {
+    public:
+        void OnCreate() override {
+            BSA_ENGINE_INFO("CubeController isimli C++ Script'i sahnede calistirilmaya basladi!");
+        }
+
+        void OnDestroy() override {
+            BSA_ENGINE_INFO("CubeController silindi!");
+        }
+
+        void OnUpdate(float ts) override {
+            // Scriptin baglandigi entity'nin bilesenine (Component) ulas!
+            auto& transformComp = GetComponent<BSA::TransformComponent>();
+            transformComp.Rotation.x += (ts * 0.5f);
+            transformComp.Rotation.y += (ts * 1.0f);
+            transformComp.Rotation.z += (ts * 0.2f);
+        }
+    };
+
 
     Application::Application() {
         if (s_Instance) {
@@ -96,11 +122,6 @@ namespace BSA {
 
         std::shared_ptr<BSA::Shader> cubeShader(BSA::Shader::Create(cubeVertexSrc, cubeFragmentSrc));
 
-        // 6. Perspective Camera (3D Kamera)
-        BSA::PerspectiveCamera camera(BSA::Math::Radians(45.0f), 1.778f, 0.1f, 100.0f);
-        camera.SetPosition(BSA::Math::Vector3(0.0f, 0.0f, 3.0f));
-
-
         // ---------- 2. KISIM: EKRAN QUAD (POST-PROCESS) ----------
         std::shared_ptr<BSA::VertexArray> screenVertexArray(BSA::VertexArray::Create());
         
@@ -154,9 +175,32 @@ namespace BSA {
         fbSpec.Height = 720;
         std::shared_ptr<BSA::Framebuffer> framebuffer(BSA::Framebuffer::Create(fbSpec));
 
+        // ---------- 4. KISIM: ECS SAHNE KURULUMU ----------
+        std::shared_ptr<BSA::Scene> activeScene = std::make_shared<BSA::Scene>();
+        
+        // "Colorful Cube" isimli bir varlık yarat ve onu oluştur
+        BSA::Entity cubeEntity = activeScene->CreateEntity("Colorful Cube");
+        cubeEntity.AddComponent<BSA::MeshRendererComponent>(); // Çizilebilir (Renderlanabilir) yap!
+        cubeEntity.AddComponent<BSA::NativeScriptComponent>().Bind<CubeController>(); // C++ Script'i bağla!
+
+        // "Child Cube" isimli uydu varlık yarat (Güneşin etrafında dönen dünya gibi)
+        BSA::Entity childCube = activeScene->CreateEntity("Child Cube");
+        childCube.AddComponent<BSA::MeshRendererComponent>();
+        auto& childTransform = childCube.GetComponent<BSA::TransformComponent>();
+        childTransform.Translation = { 2.0f, 0.0f, 0.0f }; // Ana küpten 2 birim sağda
+        childTransform.Scale = { 0.5f, 0.5f, 0.5f }; // Yarı boyutta
+        
+        // Ebeveyne (Colorful Cube) bağla!
+        childCube.SetParent(cubeEntity);
+
+        // "Main Camera" isimli yeni bir varlık yarat
+        BSA::Entity cameraEntity = activeScene->CreateEntity("Main Camera");
+        cameraEntity.AddComponent<BSA::CameraComponent>();
+        // Kamerayi uzayda geriye pozisyonluyoruz
+        cameraEntity.GetComponent<BSA::CameraComponent>().Camera.SetPosition(BSA::Math::Vector3(0.0f, 0.0f, 3.0f));
+
         // Penceremizi temsil eden geçici loop (Engine yapısı tam oturana kadar)
         GLFWwindow* window = static_cast<GLFWwindow*>(m_Window->GetNativeWindow());
-        float rotationTime = 0.0f;
 
         while (m_Running) {
             if (glfwWindowShouldClose(window))
@@ -170,18 +214,9 @@ namespace BSA {
             glClearColor(0.2f, 0.2f, 0.2f, 1.0f);
             glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT); 
 
-            cubeShader->Bind();
-            
-            rotationTime += 0.015f; 
-            BSA::Math::Matrix4 transform = BSA::Math::Matrix4(1.0f);
-            transform = BSA::Math::Matrix4::Rotate(transform, rotationTime, BSA::Math::Vector3(0.5f, 1.0f, 0.2f).Normalize());
-            
-            cubeShader->UploadUniformMat4("u_ViewProjection", camera.GetViewProjectionMatrix());
-            cubeShader->UploadUniformMat4("u_Transform", transform);
-
-            cubeVertexArray->Bind();
-            glDrawElements(GL_TRIANGLES, cubeVertexArray->GetIndexBuffer()->GetCount(), GL_UNSIGNED_INT, nullptr);
-
+            // Sahnenin (Scene) kendini isletmesine (Update etmesine) izin ver.
+            // Butun rendering (Gorsellestirme) ve Script cagirimlari bu loopun icerisindedir!
+            activeScene->OnUpdate(0.015f, cubeShader, cubeVertexArray);
             
             // --- AŞAMA 2: RENDER TO DEFAULT FRAMEBUFFER (SCREEN) ---
             framebuffer->Unbind(); // Varsayılan pencereye geri dön

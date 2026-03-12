@@ -76,6 +76,14 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(glm)
 
+# EnTT (Entity Component System)
+FetchContent_Declare(
+    entt
+    GIT_REPOSITORY https://github.com/skypjack/entt.git
+    GIT_TAG        v3.13.0
+)
+FetchContent_MakeAvailable(entt)
+
 # GLAD (OpenGL context yükleyici)
 add_library(Glad STATIC vendor/Glad/glad.c)
 target_include_directories(Glad PUBLIC vendor/Glad/include)
@@ -110,6 +118,7 @@ target_link_libraries(BSAEngine PRIVATE
     spdlog::spdlog
     glfw
     glm::glm
+    EnTT::EnTT
     Glad
 )
 
