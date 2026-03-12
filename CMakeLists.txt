@@ -68,6 +68,14 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(glfw)
 
+# GLM (OpenGL Mathematics)
+FetchContent_Declare(
+    glm
+    GIT_REPOSITORY https://github.com/g-truc/glm.git
+    GIT_TAG        1.0.1 # Veya master branch'teki stabil bir sürüm
+)
+FetchContent_MakeAvailable(glm)
+
 # -------------------------------------------------------------------
 # Kaynak Dosyaları
 # -------------------------------------------------------------------
@@ -95,6 +103,7 @@ target_include_directories(BSAEngine PRIVATE
 target_link_libraries(BSAEngine PRIVATE
     spdlog::spdlog
     glfw
+    glm::glm
 )
 
 # -------------------------------------------------------------------
