@@ -1,0 +1,35 @@
+# Derleme çıktıları
+build/
+bin/
+lib/
+out/
+.cmake/
+CMakeCache.txt
+CMakeFiles/
+CMakeScripts/
+CMakeLists.txt.user
+cmake_install.cmake
+
+# Visual Studio ve diğer IDE dosyaları
+.vs/
+*.sln
+*.vcxproj
+*.vcxproj.user
+*.vcxproj.filters
+*.suo
+*.user
+.idea/
+.vscode/
+
+# Log dosyaları
+logs/
+*.log
+
+# İşletim sistemi kalıntıları
+.DS_Store
+Thumbs.db
+
+# Üçüncü parti bağımlılıklar (FetchContent ile inenler Build klasöründe olur, 
+# ama eğer dışarıdan eklenirse diye)
+dependencies/
+vendor/
