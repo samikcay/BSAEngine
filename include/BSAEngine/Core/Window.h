@@ -3,12 +3,9 @@
 #include <string>
 #include <functional> // Required for std::function
 
-// Forward declaration for Event, assuming it's defined elsewhere
-// If Event is in a namespace, it should be forward declared with its namespace
-// e.g., namespace BSA { class Event; }
-class Event; 
-
 namespace BSA {
+
+    class Event;
 
     // ---------------------------------------------------------------
     // Pencere Özellikleri (Window Properties)

@@ -1,5 +1,6 @@
 #include "BSAEngine/Log/Log.h"
 #include "BSAEngine/Core/Window.h"
+#include "GLFWWindow.h"
 #include "BSAEngine/Events/ApplicationEvent.h"
 #include "BSAEngine/Events/MouseEvent.h"
 #include "BSAEngine/Events/KeyEvent.h"
