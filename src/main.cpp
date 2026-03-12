@@ -1,27 +1,31 @@
+#include "BSAEngine/Core/Application.h"
+#include "BSAEngine/Core/EntryPoint.h"
+#include "BSAEngine/Core/Input.h"
+#include "BSAEngine/Core/KeyCodes.h"
+#include "BSAEngine/Core/MouseButtonCodes.h"
 #include "BSAEngine/Log/Log.h"
-#include <iostream>
+#include "BSAEngine/Events/KeyEvent.h"
 
-int main() {
-    // Loglama sistemini başlat
-    BSA::Log::Init();
+// ---------------------------------------------------------------
+// İstemci (Client - Oyun) Uygulaması
+// ---------------------------------------------------------------
 
-    BSA_ENGINE_INFO("BSAEngine v0.1.0 baslatildi.");
-    BSA_ENGINE_TRACE("Trace seviyesi mesaj.");
-    BSA_ENGINE_WARN("Uyari seviyesi mesaj.");
+class Sandbox : public BSA::Application {
+public:
+    Sandbox() {
+        BSA_INFO("Sandbox Uygulamasi (Oyun) Olusturuldu!");
+    }
 
-    BSA_INFO("Client tarafinda bilgi mesaji.");
+    ~Sandbox() {
+        BSA_INFO("Sandbox Uygulamasi (Oyun) Kapatiliyor...");
+    }
 
-#ifdef BSA_PLATFORM_WINDOWS
-    BSA_ENGINE_INFO("Platform: Windows");
-#elif defined(BSA_PLATFORM_LINUX)
-    BSA_ENGINE_INFO("Platform: Linux");
-#elif defined(BSA_PLATFORM_MACOS)
-    BSA_ENGINE_INFO("Platform: macOS");
-#endif
+    // Uygulamanın OnUpdate döngüsüne (şimdilik yok) simülasyon olarak 
+    // veya Event sistemini yakalayan bir metod override edilebilir.
+    // Şimdilik test amaçlı Input sistemini kullanmak için Event'leri veya Run döngüsünü kullanabiliriz.
+};
 
-#ifdef BSA_DEBUG
-    BSA_ENGINE_WARN("Debug modu aktif.");
-#endif
-
-    return 0;
+// EntryPoint.h bu fonksiyonu arayacak ve oyunu başlatacak
+BSA::Application* BSA::CreateApplication() {
+    return new Sandbox();
 }
