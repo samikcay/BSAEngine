@@ -22,8 +22,9 @@ namespace BSA {
     namespace Math {
 
         // İlerisi için özel matematik yardımcı fonksiyonları:
-        // Örn: Rastgele sayı üretimi, interpolation(lerp) vb. fonksiyonlar 
-        // doğrudan glm içerisine ekstra olarak buradan yazılabilir.
+        static inline float Radians(float degrees) {
+            return glm::radians(degrees);
+        }
 
     }
 }

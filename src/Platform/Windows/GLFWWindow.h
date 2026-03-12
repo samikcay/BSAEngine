@@ -1,6 +1,7 @@
 #pragma once
 
 #include "BSAEngine/Core/Window.h"
+#include "BSAEngine/Renderer/GraphicsContext.h"
 #include <GLFW/glfw3.h>
 
 namespace BSA {
@@ -31,6 +32,7 @@ namespace BSA {
 
     private:
         GLFWwindow* m_Window;
+        GraphicsContext* m_Context;
 
         // GLFW callback'lerine aktarabilmek için sınıf verilerini paketleriz
         struct WindowData {

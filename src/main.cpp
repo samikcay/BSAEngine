@@ -27,7 +27,7 @@ public:
         BSA::Math::Matrix4 transform = BSA::Math::Matrix4::Translate(BSA::Math::Matrix4(1.0f), BSA::Math::Vector3(5.0f, 0.0f, 0.0f));
         
         // Quaternion (Y ekseninde 90 derece dönüş) - (Radyan ister)
-        float angleRad = glm::radians(90.0f);
+        float angleRad = BSA::Math::Radians(90.0f);
         BSA::Math::Quaternion rotation(BSA::Math::Vector3(0.0f, angleRad, 0.0f));
         
         // Dönüşümü ve dönmeyi (Rotation) birleştirmek

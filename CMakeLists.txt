@@ -76,11 +76,16 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(glm)
 
+# GLAD (OpenGL context yükleyici)
+add_library(Glad STATIC vendor/Glad/glad.c)
+target_include_directories(Glad PUBLIC vendor/Glad/include)
+
 # -------------------------------------------------------------------
 # Kaynak Dosyaları
 # -------------------------------------------------------------------
 file(GLOB_RECURSE BSA_SOURCES
     ${CMAKE_SOURCE_DIR}/src/*.cpp
+    ${CMAKE_SOURCE_DIR}/vendor/stb_image/stb_image.cpp
 )
 
 file(GLOB_RECURSE BSA_HEADERS
@@ -95,6 +100,7 @@ add_executable(BSAEngine ${BSA_SOURCES} ${BSA_HEADERS})
 
 target_include_directories(BSAEngine PRIVATE
     ${CMAKE_SOURCE_DIR}/include
+    ${CMAKE_SOURCE_DIR}/vendor/stb_image
 )
 
 # -------------------------------------------------------------------
@@ -104,6 +110,7 @@ target_link_libraries(BSAEngine PRIVATE
     spdlog::spdlog
     glfw
     glm::glm
+    Glad
 )
 
 # -------------------------------------------------------------------

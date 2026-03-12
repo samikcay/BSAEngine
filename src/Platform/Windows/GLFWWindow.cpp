@@ -4,6 +4,7 @@
 #include "BSAEngine/Events/ApplicationEvent.h"
 #include "BSAEngine/Events/MouseEvent.h"
 #include "BSAEngine/Events/KeyEvent.h"
+#include "../OpenGL/OpenGLContext.h"
 
 namespace BSA {
 
@@ -50,7 +51,9 @@ namespace BSA {
 
         m_Window = glfwCreateWindow((int)props.Width, (int)props.Height, m_Data.Title.c_str(), nullptr, nullptr);
         
-        glfwMakeContextCurrent(m_Window);
+        m_Context = new OpenGLContext(m_Window);
+        m_Context->Init();
+
         glfwSetWindowUserPointer(m_Window, &m_Data); // Callbacks için veri aktarımı
         SetVSync(true); // Varsayılan olarak VSync açık
 
@@ -127,6 +130,7 @@ namespace BSA {
     }
 
     void GLFWWindow::Shutdown() {
+        delete m_Context;
         glfwDestroyWindow(m_Window);
         // Motor tamamen kapanırken glfwTerminate çağırmak daha sağlıklıdır, 
         // ancak şimdilik basitlik için sadece pencereyi siliyoruz.
@@ -134,7 +138,7 @@ namespace BSA {
 
     void GLFWWindow::OnUpdate() {
         glfwPollEvents();
-        glfwSwapBuffers(m_Window);
+        m_Context->SwapBuffers();
     }
 
     void GLFWWindow::SetVSync(bool enabled) {
