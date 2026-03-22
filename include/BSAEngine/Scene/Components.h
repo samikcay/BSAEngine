@@ -78,4 +78,78 @@ namespace BSA {
         }
     };
 
+    struct ScriptComponent {
+        std::string ClassName; // Ornek: "Sandbox.Player"
+        bool Instantiated = false;
+
+        ScriptComponent() = default;
+        ScriptComponent(const ScriptComponent&) = default;
+        ScriptComponent(const std::string& className) : ClassName(className) {}
+    };
+
+    // ============================================
+    // FİZİK COMPONENTLERİ
+    // ============================================
+
+    // Rigid Body Tipleri
+    enum class BodyType {
+        Static = 0,    // Hareket etmez (yer, duvar vb.)
+        Dynamic,       // Fizik kuvvetlerine tepki verir (oyuncu, mermi vb.)
+        Kinematic      // Programatik hareket eder, fizikten etkilenmez ama başkalarını iter
+    };
+
+    struct RigidbodyComponent {
+        BodyType Type = BodyType::Dynamic;
+
+        // Kütle ve yerçekimi
+        float Mass = 1.0f;
+        float GravityScale = 1.0f;
+
+        // Hareket kısıtlamaları
+        bool FixedRotation = false; // true ise fizik motoru bu cismi döndürmez
+
+        // Başlangıç hızları (simülasyon başladığında uygulanır)
+        BSA::Math::Vector3 LinearVelocity = { 0.0f, 0.0f, 0.0f };
+        BSA::Math::Vector3 AngularVelocity = { 0.0f, 0.0f, 0.0f };
+
+        // Runtime: Fizik motorunun iç body pointer'ı (Box2D b2Body* veya Jolt BodyID)
+        // Bu alan serialize edilmez, sadece çalışma zamanında kullanılır
+        void* RuntimeBody = nullptr;
+
+        RigidbodyComponent() = default;
+        RigidbodyComponent(const RigidbodyComponent&) = default;
+    };
+
+    struct BoxColliderComponent {
+        // Yarı boyutlar (half-extents): Kutunun merkeze göre X, Y, Z uzantıları
+        BSA::Math::Vector3 HalfExtents = { 0.5f, 0.5f, 0.5f };
+
+        // Entity merkezine göre collider ofseti
+        BSA::Math::Vector3 Offset = { 0.0f, 0.0f, 0.0f };
+
+        // Fiziksel malzeme özellikleri
+        float Density = 1.0f;       // Yoğunluk (kütle hesabını etkiler)
+        float Friction = 0.5f;      // Sürtünme katsayısı (0 = buz, 1 = kauçuk)
+        float Restitution = 0.0f;   // Sekme katsayısı (0 = sönümlü, 1 = tam elastik)
+
+        BoxColliderComponent() = default;
+        BoxColliderComponent(const BoxColliderComponent&) = default;
+    };
+
+    struct SphereColliderComponent {
+        // Küre yarıçapı
+        float Radius = 0.5f;
+
+        // Entity merkezine göre collider ofseti
+        BSA::Math::Vector3 Offset = { 0.0f, 0.0f, 0.0f };
+
+        // Fiziksel malzeme özellikleri
+        float Density = 1.0f;
+        float Friction = 0.5f;
+        float Restitution = 0.0f;
+
+        SphereColliderComponent() = default;
+        SphereColliderComponent(const SphereColliderComponent&) = default;
+    };
+
 }

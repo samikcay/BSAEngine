@@ -1,4 +1,5 @@
 #include "BSAEngine/Core/Application.h"
+#include "BSAEngine/ImGui/ImGuiLayer.h"
 #include "BSAEngine/Log/Log.h"
 #include "BSAEngine/Events/ApplicationEvent.h"
 #include "BSAEngine/Renderer/Buffer.h"
@@ -11,8 +12,12 @@
 #include "BSAEngine/Scene/Components.h"
 #include "BSAEngine/Scene/ScriptableEntity.h"
 #include "BSAEngine/Math/Math.h"
+#include "BSAEngine/Panels/SceneHierarchyPanel.h"
+#include "BSAEngine/Panels/ContentBrowserPanel.h" // Added this include
+#include "BSAEngine/Scripting/ScriptEngine.h" // Added this include
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
+#include <imgui.h>
 
 namespace BSA {
 
@@ -54,10 +59,15 @@ namespace BSA {
         
         // Window'dan gelen eventleri (OnEvent) fonksiyonuna bagla
         m_Window->SetEventCallback(std::bind(&Application::OnEvent, this, std::placeholders::_1));
+
+        // ImGui katmanini yarat ve baslat
+        m_ImGuiLayer = std::make_unique<ImGuiLayer>();
+        m_ImGuiLayer->Init();
     }
 
     Application::~Application() {
         BSA_ENGINE_INFO("Sandbox Uygulamasi (Oyun) Kapatiliyor...");
+        m_ImGuiLayer->Shutdown();
     }
 
     void Application::Run() {
@@ -122,51 +132,7 @@ namespace BSA {
 
         std::shared_ptr<BSA::Shader> cubeShader(BSA::Shader::Create(cubeVertexSrc, cubeFragmentSrc));
 
-        // ---------- 2. KISIM: EKRAN QUAD (POST-PROCESS) ----------
-        std::shared_ptr<BSA::VertexArray> screenVertexArray(BSA::VertexArray::Create());
-        
-        float screenQuadVertices[] = {
-            // positions   // texCoords
-            -1.0f,  1.0f,  0.0f, 1.0f,
-            -1.0f, -1.0f,  0.0f, 0.0f,
-             1.0f, -1.0f,  1.0f, 0.0f,
-             1.0f,  1.0f,  1.0f, 1.0f
-        };
-        std::shared_ptr<BSA::VertexBuffer> screenVB(BSA::VertexBuffer::Create(screenQuadVertices, sizeof(screenQuadVertices)));
-        screenVB->SetLayout({
-            { BSA::ShaderDataType::Float2, "a_Position" },
-            { BSA::ShaderDataType::Float2, "a_TexCoord" }
-        });
-        screenVertexArray->AddVertexBuffer(screenVB);
 
-        uint32_t screenQuadIndices[] = { 0, 1, 2, 2, 3, 0 };
-        std::shared_ptr<BSA::IndexBuffer> screenIB(BSA::IndexBuffer::Create(screenQuadIndices, sizeof(screenQuadIndices) / sizeof(uint32_t)));
-        screenVertexArray->SetIndexBuffer(screenIB);
-
-        std::string screenVertexSrc = R"(
-            #version 330 core
-            layout(location = 0) in vec2 a_Position;
-            layout(location = 1) in vec2 a_TexCoord;
-            out vec2 v_TexCoord;
-            void main() {
-                v_TexCoord = a_TexCoord;
-                gl_Position = vec4(a_Position.x, a_Position.y, 0.0, 1.0);
-            }
-        )";
-
-        std::string screenFragmentSrc = R"(
-            #version 330 core
-            layout(location = 0) out vec4 FragColor;
-            in vec2 v_TexCoord;
-            uniform sampler2D u_ScreenTexture;
-            void main() {
-                // Post-process shader: Basit Texture pass (Ileride blur, renk tersine çevirme vs. eklenebilir)
-                vec3 col = texture(u_ScreenTexture, v_TexCoord).rgb;
-                FragColor = vec4(col, 1.0);
-            }
-        )";
-
-        std::shared_ptr<BSA::Shader> screenShader(BSA::Shader::Create(screenVertexSrc, screenFragmentSrc));
 
 
         // ---------- 3. KISIM: FRAMEBUFFER (OFF-SCREEN HEDEFİ) ----------
@@ -174,6 +140,12 @@ namespace BSA {
         fbSpec.Width = 1280;
         fbSpec.Height = 720;
         std::shared_ptr<BSA::Framebuffer> framebuffer(BSA::Framebuffer::Create(fbSpec));
+
+        // ---------- C# SCRIPT ENGINE BAŞLATMA ----------
+        BSA::ScriptEngine::Init();
+        // İleride bu dll oyun projesinden (ör: Sandbox/bin) yüklenecek
+        BSA::ScriptEngine::LoadAssembly("bin/Debug/Debug/BSA-ScriptCore.dll");
+        BSA::ScriptEngine::PrintAssemblyTypes();
 
         // ---------- 4. KISIM: ECS SAHNE KURULUMU ----------
         std::shared_ptr<BSA::Scene> activeScene = std::make_shared<BSA::Scene>();
@@ -199,12 +171,42 @@ namespace BSA {
         // Kamerayi uzayda geriye pozisyonluyoruz
         cameraEntity.GetComponent<BSA::CameraComponent>().Camera.SetPosition(BSA::Math::Vector3(0.0f, 0.0f, 3.0f));
 
+        // Scene Hierarchy ve Inspector panelini yarat
+        BSA::SceneHierarchyPanel sceneHierarchyPanel(activeScene);
+        BSA::ContentBrowserPanel contentBrowserPanel;
+
+        // Viewport paneli boyut takibi
+        ImVec2 viewportSize = { (float)fbSpec.Width, (float)fbSpec.Height };
+
         // Penceremizi temsil eden geçici loop (Engine yapısı tam oturana kadar)
         GLFWwindow* window = static_cast<GLFWwindow*>(m_Window->GetNativeWindow());
 
+        float lastFrameTime = 0.0f;
+        float fixedTimeStep = 1.0f / 60.0f; // 60 Hz fizik güncellemesi
+        float accumulator = 0.0f;
+
+        // --- FİZİK MOTORUNU BAŞLAT ---
+        activeScene->StartPhysics();
+
         while (m_Running) {
+            float time = (float)glfwGetTime();
+            float timestep = time - lastFrameTime;
+            lastFrameTime = time;
+
+            // Maksimum frame gecikmesi siniri (spiral of death onleyici)
+            if (timestep > 0.25f)
+                timestep = 0.25f;
+
+            accumulator += timestep;
+
             if (glfwWindowShouldClose(window))
                 m_Running = false;
+
+            // --- FİZİK GÜNCELLEMESİ (FIXED UPDATE) ---
+            while (accumulator >= fixedTimeStep) {
+                activeScene->OnFixedUpdate(fixedTimeStep);
+                accumulator -= fixedTimeStep;
+            }
 
             // --- AŞAMA 1: RENDER TO FRAMEBUFFER ---
             framebuffer->Bind();
@@ -216,31 +218,108 @@ namespace BSA {
 
             // Sahnenin (Scene) kendini isletmesine (Update etmesine) izin ver.
             // Butun rendering (Gorsellestirme) ve Script cagirimlari bu loopun icerisindedir!
-            activeScene->OnUpdate(0.015f, cubeShader, cubeVertexArray);
+            activeScene->OnUpdate(timestep, cubeShader, cubeVertexArray);
             
-            // --- AŞAMA 2: RENDER TO DEFAULT FRAMEBUFFER (SCREEN) ---
-            framebuffer->Unbind(); // Varsayılan pencereye geri dön
-            glDisable(GL_DEPTH_TEST); // Ekrana cizecegimiz Quad icin depth testing kapatiliyor
-            
-            glClearColor(1.0f, 1.0f, 1.0f, 1.0f); // Screen temizleme (beyaz)
+            // --- AŞAMA 2: FRAMEBUFFER'I BIRAK, EKRANI TEMİZLE ---
+            framebuffer->Unbind();
+            glDisable(GL_DEPTH_TEST);
+            glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
             glClear(GL_COLOR_BUFFER_BIT);
 
-            screenShader->Bind();
-            // 0 Texture slotuna FBO'nun Color Attachmentini gonder
-            glBindTexture(GL_TEXTURE_2D, framebuffer->GetColorAttachmentRendererID());
-            
-            screenVertexArray->Bind();
-            glDrawElements(GL_TRIANGLES, screenVertexArray->GetIndexBuffer()->GetCount(), GL_UNSIGNED_INT, nullptr);
+            // --- AŞAMA 3: IMGUI + DOCKSPACE ---
+            m_ImGuiLayer->Begin();
 
+            // Dockspace ayarları
+            static bool dockspaceOpen = true;
+            static bool opt_fullscreen_persistant = true;
+            bool opt_fullscreen = opt_fullscreen_persistant;
+            static ImGuiDockNodeFlags dockspace_flags = ImGuiDockNodeFlags_None;
+
+            ImGuiWindowFlags window_flags = ImGuiWindowFlags_MenuBar | ImGuiWindowFlags_NoDocking;
+            ImGuiViewport* viewport = ImGui::GetMainViewport();
+            if (opt_fullscreen) {
+                ImGui::SetNextWindowPos(viewport->WorkPos);
+                ImGui::SetNextWindowSize(viewport->WorkSize);
+                ImGui::SetNextWindowViewport(viewport->ID);
+                ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 0.0f);
+                ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.0f);
+                window_flags |= ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove;
+                window_flags |= ImGuiWindowFlags_NoBringToFrontOnFocus | ImGuiWindowFlags_NoNavFocus;
+            }
+
+            // Dockspace arka planını gizlemek istersen ImGuiWindowFlags_NoBackground ekleyebilirsin
+            if (dockspace_flags & ImGuiDockNodeFlags_PassthruCentralNode)
+                window_flags |= ImGuiWindowFlags_NoBackground;
+
+            ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0.0f, 0.0f));
+            ImGui::Begin("BSAEngine DockSpace", &dockspaceOpen, window_flags);
+            ImGui::PopStyleVar();
+
+            if (opt_fullscreen)
+                ImGui::PopStyleVar(2);
+
+            // Dockspace'in aktif olmadığı durumlarda ImGui demo penceresi gibi klasik pencere mantığı ile devam eder
+            ImGuiIO& io = ImGui::GetIO();
+            if (io.ConfigFlags & ImGuiConfigFlags_DockingEnable) {
+                ImGuiID dockspace_id = ImGui::GetID("BSAEngineDockSpace");
+                ImGui::DockSpace(dockspace_id, ImVec2(0.0f, 0.0f), dockspace_flags);
+            }
+
+            // Üst menü bar
+            if (ImGui::BeginMenuBar()) {
+                if (ImGui::BeginMenu("File")) {
+                    if (ImGui::MenuItem("Exit")) {
+                        Close();
+                    }
+                    ImGui::EndMenu();
+                }
+                ImGui::EndMenuBar();
+            }
+
+            // --- SCENE HIERARCHY & INSPECTOR ---
+            sceneHierarchyPanel.OnImGuiRender();
+
+            // --- CONTENT BROWSER ---
+            contentBrowserPanel.OnImGuiRender();
+
+            // --- VIEWPORT PANELİ ---
+            ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2{ 0, 0 });
+            ImGui::Begin("Viewport");
+
+            // Panel boyutu değiştiyse framebuffer'ı yeniden oluştur
+            ImVec2 viewportPanelSize = ImGui::GetContentRegionAvail();
+            if (viewportSize.x != viewportPanelSize.x || viewportSize.y != viewportPanelSize.y) {
+                viewportSize = viewportPanelSize;
+                framebuffer->Resize((uint32_t)viewportSize.x, (uint32_t)viewportSize.y);
+            }
+
+            // Framebuffer texture'ünü Viewport paneline çiz
+            uint32_t textureID = framebuffer->GetColorAttachmentRendererID();
+            ImGui::Image((ImTextureID)(uint64_t)textureID, viewportSize, ImVec2{ 0, 1 }, ImVec2{ 1, 0 });
+
+            ImGui::End();
+            ImGui::PopStyleVar();
+
+            ImGui::End(); // Dockspace ana penceresi
+
+            m_ImGuiLayer->End();
 
             // Cift Buffer temizligi vb.
             m_Window->OnUpdate();
         }
+
+        // --- FİZİK MOTORUNU DURDUR ---
+        activeScene->StopPhysics();
+
+        // --- C# MONO MOTORUNU KAPAT ---
+        BSA::ScriptEngine::Shutdown();
     }
 
     void Application::OnEvent(Event& e) {
         EventDispatcher dispatcher(e);
         dispatcher.Dispatch<WindowCloseEvent>(std::bind(&Application::OnWindowClose, this, std::placeholders::_1));
+
+        m_ImGuiLayer->OnEvent(e);
 
         // Test amaçlı tüm Eventleri bas (İlerde kaldırılacak)
         // BSA_ENGINE_TRACE("{0}", e.ToString());

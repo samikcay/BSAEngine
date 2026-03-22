@@ -48,6 +48,14 @@ endif()
 # -------------------------------------------------------------------
 include(FetchContent)
 
+# ImGui (Docking Branch)
+FetchContent_Declare(
+    imgui
+    GIT_REPOSITORY https://github.com/ocornut/imgui.git
+    GIT_TAG        docking
+)
+FetchContent_MakeAvailable(imgui)
+
 # spdlog
 FetchContent_Declare(
     spdlog
@@ -84,6 +92,33 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(entt)
 
+# Box2D (2D Fizik Motoru)
+set(BOX2D_BUILD_UNIT_TESTS OFF CACHE BOOL "" FORCE)
+set(BOX2D_BUILD_TESTBED OFF CACHE BOOL "" FORCE)
+
+FetchContent_Declare(
+    box2d
+    GIT_REPOSITORY https://github.com/erincatto/box2d.git
+    GIT_TAG        v2.4.2
+)
+FetchContent_MakeAvailable(box2d)
+
+# Jolt Physics (3D Fizik Motoru)
+set(TARGET_UNIT_TESTS OFF CACHE BOOL "" FORCE)
+set(TARGET_HELLO_WORLD OFF CACHE BOOL "" FORCE)
+set(TARGET_PERFORMANCE_TEST OFF CACHE BOOL "" FORCE)
+set(TARGET_SAMPLES OFF CACHE BOOL "" FORCE)
+set(TARGET_VIEWER OFF CACHE BOOL "" FORCE)
+set(USE_STATIC_MSVC_RUNTIME_LIBRARY OFF CACHE BOOL "" FORCE)
+
+FetchContent_Declare(
+    JoltPhysics
+    GIT_REPOSITORY https://github.com/jrouwe/JoltPhysics.git
+    GIT_TAG        v5.2.0
+    SOURCE_SUBDIR  Build
+)
+FetchContent_MakeAvailable(JoltPhysics)
+
 # GLAD (OpenGL context yükleyici)
 add_library(Glad STATIC vendor/Glad/glad.c)
 target_include_directories(Glad PUBLIC vendor/Glad/include)
@@ -91,9 +126,16 @@ target_include_directories(Glad PUBLIC vendor/Glad/include)
 # -------------------------------------------------------------------
 # Kaynak Dosyaları
 # -------------------------------------------------------------------
+file(GLOB IMGUI_SOURCES
+    ${imgui_SOURCE_DIR}/*.cpp
+    ${imgui_SOURCE_DIR}/backends/imgui_impl_glfw.cpp
+    ${imgui_SOURCE_DIR}/backends/imgui_impl_opengl3.cpp
+)
+
 file(GLOB_RECURSE BSA_SOURCES
     ${CMAKE_SOURCE_DIR}/src/*.cpp
     ${CMAKE_SOURCE_DIR}/vendor/stb_image/stb_image.cpp
+    ${IMGUI_SOURCES} # ImGui dosyalarını buraya ekledik
 )
 
 file(GLOB_RECURSE BSA_HEADERS
@@ -109,6 +151,9 @@ add_executable(BSAEngine ${BSA_SOURCES} ${BSA_HEADERS})
 target_include_directories(BSAEngine PRIVATE
     ${CMAKE_SOURCE_DIR}/include
     ${CMAKE_SOURCE_DIR}/vendor/stb_image
+    ${imgui_SOURCE_DIR}          # ImGui Core Headerları
+    ${imgui_SOURCE_DIR}/backends # ImGui Backend Headerları
+    ${CMAKE_SOURCE_DIR}/vendor/mono/include/mono-2.0
 )
 
 # -------------------------------------------------------------------
@@ -120,6 +165,18 @@ target_link_libraries(BSAEngine PRIVATE
     glm::glm
     EnTT::EnTT
     Glad
+    box2d
+    Jolt
+    ${CMAKE_SOURCE_DIR}/vendor/mono/lib/mono-2.0-sgen.lib
+)
+
+# -------------------------------------------------------------------
+# Post-Build: Copy Mono DLL
+# -------------------------------------------------------------------
+add_custom_command(TARGET BSAEngine POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        "${CMAKE_SOURCE_DIR}/vendor/mono/bin/mono-2.0-sgen.dll"
+        $<TARGET_FILE_DIR:BSAEngine>
 )
 
 # -------------------------------------------------------------------

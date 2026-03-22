@@ -1,0 +1,25 @@
+#pragma once
+
+#include "BSAEngine/Scene/Scene.h"
+#include "BSAEngine/Scene/Entity.h"
+#include <memory>
+
+namespace BSA {
+
+    class SceneHierarchyPanel {
+    public:
+        SceneHierarchyPanel() = default;
+        SceneHierarchyPanel(const std::shared_ptr<Scene>& context);
+
+        void SetContext(const std::shared_ptr<Scene>& context);
+        void OnImGuiRender();
+
+    private:
+        void DrawEntityNode(Entity entity);
+        void DrawComponents(Entity entity);
+
+        std::shared_ptr<Scene> m_Context;
+        Entity m_SelectionContext; // Secili entity
+    };
+
+}
