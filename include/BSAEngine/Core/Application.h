@@ -1,6 +1,7 @@
 #pragma once
 
 #include "BSAEngine/Core/Window.h"
+#include "BSAEngine/Core/LayerStack.h"
 #include <memory>
 
 namespace BSA {
@@ -24,6 +25,9 @@ namespace BSA {
         // Pencereden veya başka yerlerden gelen olayları işler
         void OnEvent(Event& e);
 
+        void PushLayer(Layer* layer);
+        void PushOverlay(Layer* overlay);
+
         // Motoru güvenli şekilde kapatmak için
         void Close() { m_Running = false; }
 
@@ -37,6 +41,7 @@ namespace BSA {
         std::unique_ptr<Window> m_Window;
         std::unique_ptr<ImGuiLayer> m_ImGuiLayer;
         bool m_Running = true;
+        LayerStack m_LayerStack;
 
         static Application* s_Instance;
     };

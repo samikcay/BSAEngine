@@ -1,0 +1,11 @@
+{
+  "version": 2,
+  "dgSpecHash": "hrw2TX+f4A0=",
+  "success": true,
+  "projectFilePath": "C:\\Users\\sami\\Desktop\\antigravity projeleri\\BSAEngine\\BSAEngine-ScriptCore\\BSA-ScriptCore.csproj",
+  "expectedPackageFiles": [
+    "C:\\Users\\sami\\.nuget\\packages\\microsoft.netcore.platforms\\1.1.0\\microsoft.netcore.platforms.1.1.0.nupkg.sha512",
+    "C:\\Users\\sami\\.nuget\\packages\\netstandard.library\\2.0.3\\netstandard.library.2.0.3.nupkg.sha512"
+  ],
+  "logs": []
+}

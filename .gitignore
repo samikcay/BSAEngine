@@ -32,4 +32,5 @@ Thumbs.db
 # Üçüncü parti bağımlılıklar (FetchContent ile inenler Build klasöründe olur, 
 # ama eğer dışarıdan eklenirse diye)
 dependencies/
-vendor/
+# vendor/
+

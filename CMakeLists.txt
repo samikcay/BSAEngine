@@ -119,6 +119,18 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(JoltPhysics)
 
+# yaml-cpp (Serialization)
+set(YAML_CPP_BUILD_TESTS OFF CACHE BOOL "" FORCE)
+set(YAML_CPP_BUILD_TOOLS OFF CACHE BOOL "" FORCE)
+set(YAML_CPP_BUILD_CONTRIB OFF CACHE BOOL "" FORCE)
+
+FetchContent_Declare(
+    yaml-cpp
+    GIT_REPOSITORY https://github.com/jbeder/yaml-cpp.git
+    GIT_TAG        0.8.0
+)
+FetchContent_MakeAvailable(yaml-cpp)
+
 # GLAD (OpenGL context yükleyici)
 add_library(Glad STATIC vendor/Glad/glad.c)
 target_include_directories(Glad PUBLIC vendor/Glad/include)
@@ -135,7 +147,6 @@ file(GLOB IMGUI_SOURCES
 file(GLOB_RECURSE BSA_SOURCES
     ${CMAKE_SOURCE_DIR}/src/*.cpp
     ${CMAKE_SOURCE_DIR}/vendor/stb_image/stb_image.cpp
-    ${IMGUI_SOURCES} # ImGui dosyalarını buraya ekledik
 )
 
 file(GLOB_RECURSE BSA_HEADERS
@@ -146,7 +157,7 @@ file(GLOB_RECURSE BSA_HEADERS
 # -------------------------------------------------------------------
 # Hedef: BSAEngine (çalıştırılabilir)
 # -------------------------------------------------------------------
-add_executable(BSAEngine ${BSA_SOURCES} ${BSA_HEADERS})
+add_executable(BSAEngine ${BSA_SOURCES} ${BSA_HEADERS} ${IMGUI_SOURCES})
 
 target_include_directories(BSAEngine PRIVATE
     ${CMAKE_SOURCE_DIR}/include
@@ -167,12 +178,29 @@ target_link_libraries(BSAEngine PRIVATE
     Glad
     box2d
     Jolt
-    ${CMAKE_SOURCE_DIR}/vendor/mono/lib/mono-2.0-sgen.lib
+    yaml-cpp
 )
 
+if(WIN32)
+    target_link_libraries(BSAEngine PRIVATE ${CMAKE_SOURCE_DIR}/vendor/mono/lib/mono-2.0-sgen.lib)
+elseif(UNIX)
+    find_library(MONO_LIB mono-2.0 PATHS /usr/lib /usr/local/lib)
+    if(MONO_LIB)
+        target_link_libraries(BSAEngine PRIVATE ${MONO_LIB})
+    else()
+        message(WARNING "Mono library not found. Scripting support will not be available.")
+    endif()
+endif()
+
 # -------------------------------------------------------------------
-# Post-Build: Copy Mono DLL
+# Post-Build: Copy Assets and Mono DLL
 # -------------------------------------------------------------------
+add_custom_command(TARGET BSAEngine POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_directory
+        "${CMAKE_SOURCE_DIR}/assets"
+        "$<TARGET_FILE_DIR:BSAEngine>/assets"
+)
+
 add_custom_command(TARGET BSAEngine POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy_if_different
         "${CMAKE_SOURCE_DIR}/vendor/mono/bin/mono-2.0-sgen.dll"

@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(find 'C:\\\\Users\\\\sami\\\\Desktop\\\\antigravity projeleri\\\\BSAEngine\\\\assets' -type f \\\\\\(-name *.ttf -o -name *.otf -o -name *.png -o -name *.jpg \\\\\\))",
+      "Bash(cmake --build build --config Debug)"
+    ]
+  }
+}

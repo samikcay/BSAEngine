@@ -3,10 +3,22 @@
 #include "BSAEngine/Math/Matrix4.h"
 #include "BSAEngine/Math/Vector3.h"
 #include "BSAEngine/Renderer/PerspectiveCamera.h"
+#include "BSAEngine/Renderer/StaticMesh.h"
+#include "BSAEngine/Renderer/Material.h"
+#include "BSAEngine/Core/UUID.h"
 #include <string>
 #include <vector>
+#include <memory>
+#include <glm/glm.hpp>
 
 namespace BSA {
+
+    struct IDComponent {
+        UUID ID;
+
+        IDComponent() = default;
+        IDComponent(const IDComponent&) = default;
+    };
 
     struct TagComponent {
         std::string Tag;
@@ -38,12 +50,13 @@ namespace BSA {
     };
 
     struct MeshRendererComponent {
-        // İleride buraya Mesh objesi (VBO/IBO baglantilari) ve Material eklenecek.
-        // Şimdilik sadece varlığına dair bir "flag (etiket)" görevi görerek
-        // Sandbox içindeki render motorunu tetikleyecek.
-        int dummy = 0;
+        std::shared_ptr<StaticMesh> Mesh;
+        std::shared_ptr<Material> Mat;
 
         MeshRendererComponent() = default;
+        MeshRendererComponent(const std::shared_ptr<StaticMesh>& mesh) : Mesh(mesh) {}
+        MeshRendererComponent(const std::shared_ptr<StaticMesh>& mesh, const std::shared_ptr<Material>& material) 
+            : Mesh(mesh), Mat(material) {}
     };
 
     struct RelationshipComponent {
@@ -57,8 +70,13 @@ namespace BSA {
     struct CameraComponent {
         BSA::PerspectiveCamera Camera;
         bool Primary = true; // Ana kameramiz mi? (Birden fazla kamera olursa isimize yariyor)
+        bool FixedAspectRatio = false;
 
-        CameraComponent() : Camera(BSA::Math::Radians(45.0f), 1.778f, 0.1f, 100.0f) {}
+        float FOV = 45.0f; // Degrees
+        float Near = 0.1f;
+        float Far = 1000.0f;
+
+        CameraComponent() : Camera(BSA::Math::Radians(45.0f), 1.778f, 0.1f, 1000.0f) {}
         CameraComponent(const CameraComponent&) = default;
     };
 
@@ -98,7 +116,7 @@ namespace BSA {
         Kinematic      // Programatik hareket eder, fizikten etkilenmez ama başkalarını iter
     };
 
-    struct RigidbodyComponent {
+    struct Rigidbody2DComponent {
         BodyType Type = BodyType::Dynamic;
 
         // Kütle ve yerçekimi
@@ -116,11 +134,11 @@ namespace BSA {
         // Bu alan serialize edilmez, sadece çalışma zamanında kullanılır
         void* RuntimeBody = nullptr;
 
-        RigidbodyComponent() = default;
-        RigidbodyComponent(const RigidbodyComponent&) = default;
+        Rigidbody2DComponent() = default;
+        Rigidbody2DComponent(const Rigidbody2DComponent&) = default;
     };
 
-    struct BoxColliderComponent {
+    struct BoxCollider2DComponent {
         // Yarı boyutlar (half-extents): Kutunun merkeze göre X, Y, Z uzantıları
         BSA::Math::Vector3 HalfExtents = { 0.5f, 0.5f, 0.5f };
 
@@ -132,11 +150,11 @@ namespace BSA {
         float Friction = 0.5f;      // Sürtünme katsayısı (0 = buz, 1 = kauçuk)
         float Restitution = 0.0f;   // Sekme katsayısı (0 = sönümlü, 1 = tam elastik)
 
-        BoxColliderComponent() = default;
-        BoxColliderComponent(const BoxColliderComponent&) = default;
+        BoxCollider2DComponent() = default;
+        BoxCollider2DComponent(const BoxCollider2DComponent&) = default;
     };
 
-    struct SphereColliderComponent {
+    struct CircleCollider2DComponent {
         // Küre yarıçapı
         float Radius = 0.5f;
 
@@ -148,8 +166,45 @@ namespace BSA {
         float Friction = 0.5f;
         float Restitution = 0.0f;
 
-        SphereColliderComponent() = default;
-        SphereColliderComponent(const SphereColliderComponent&) = default;
+        CircleCollider2DComponent() = default;
+        CircleCollider2DComponent(const CircleCollider2DComponent&) = default;
+    };
+
+    // ============================================
+    // IŞIK COMPONENTLERİ
+    // ============================================
+
+    struct DirectionalLightComponent {
+        glm::vec3 Color = { 1.0f, 1.0f, 1.0f };
+        float Intensity = 1.0f;
+
+        DirectionalLightComponent() = default;
+        DirectionalLightComponent(const DirectionalLightComponent&) = default;
+    };
+
+    struct PointLightComponent {
+        glm::vec3 Color = { 1.0f, 1.0f, 1.0f };
+        float Intensity = 1.0f;
+        float Constant = 1.0f;
+        float Linear = 0.09f;
+        float Quadratic = 0.032f;
+
+        PointLightComponent() = default;
+        PointLightComponent(const PointLightComponent&) = default;
+    };
+
+    struct SpotLightComponent {
+        glm::vec3 Color = { 1.0f, 1.0f, 1.0f };
+        float Intensity = 1.0f;
+        float CutOff = 12.5f;      // Derece cinsinden
+        float OuterCutOff = 15.0f; // Derece cinsinden
+
+        float Constant = 1.0f;
+        float Linear = 0.09f;
+        float Quadratic = 0.032f;
+
+        SpotLightComponent() = default;
+        SpotLightComponent(const SpotLightComponent&) = default;
     };
 
 }

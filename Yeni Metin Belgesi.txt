@@ -1,0 +1,4 @@
+dosya silme/yeniden adlandırma eklenecek.
+hazır objeler eklenecek (küp, silindir, küre vb.)
+sahne ekranı eklenecek.
+ui daha düzgün gözükecek şekilde düzeltilecek.

@@ -9,7 +9,7 @@ namespace BSA {
     OpenGLVertexBuffer::OpenGLVertexBuffer(float* vertices, uint32_t size) {
         glCreateBuffers(1, &m_RendererID);
         glBindBuffer(GL_ARRAY_BUFFER, m_RendererID);
-        glBufferData(GL_ARRAY_BUFFER, size, vertices, GL_STATIC_DRAW);
+        glBufferData(GL_ARRAY_BUFFER, size, vertices, vertices ? GL_STATIC_DRAW : GL_DYNAMIC_DRAW);
     }
 
     OpenGLVertexBuffer::~OpenGLVertexBuffer() {
@@ -22,6 +22,10 @@ namespace BSA {
 
     void OpenGLVertexBuffer::Unbind() const {
         glBindBuffer(GL_ARRAY_BUFFER, 0);
+    }
+
+    void OpenGLVertexBuffer::SetData(const void* data, uint32_t size) {
+        glNamedBufferSubData(m_RendererID, 0, size, data);
     }
 
     // ---------------------------------------------------------------

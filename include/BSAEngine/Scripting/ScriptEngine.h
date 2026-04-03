@@ -12,6 +12,7 @@ namespace BSA {
 
         // C# Derlenmis DLL'ini motora yukler
         static void LoadAssembly(const std::string& filepath);
+        static void ReloadAssembly();
 
         // Test amacli: DLL icindeki Butun sinif ve fonksiyonlari (Namespace:Class) yazdirir
         static void PrintAssemblyTypes();

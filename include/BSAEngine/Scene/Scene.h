@@ -20,6 +20,7 @@ namespace BSA {
         ~Scene();
 
         Entity CreateEntity(const std::string& name = std::string());
+        Entity CreateEntityWithUUID(UUID uuid, const std::string& name = std::string());
         void DestroyEntity(Entity entity);
 
         // Hiyerarşi Yardımcıları (Scene Graph)
@@ -29,13 +30,16 @@ namespace BSA {
         void OnFixedUpdate(float fixedTimeStep);
 
         // Ana oyun döngüsü metodu (Her frame çalisir)
-        void OnUpdate(float ts, std::shared_ptr<BSA::Shader> defaultShader, std::shared_ptr<BSA::VertexArray> defaultVAO);
+        void OnUpdate(float ts, const glm::mat4& viewProjection, const glm::vec3& cameraPosition, std::shared_ptr<Shader> defaultShader, std::shared_ptr<VertexArray> defaultVAO);
+        void OnUpdate(float ts, std::shared_ptr<Shader> defaultShader, std::shared_ptr<VertexArray> defaultVAO); // Overload for primary camera
+
+        void OnViewportResize(uint32_t width, uint32_t height);
 
         // Sandbox/Renderer tarafindan ECS objelerine ulasmak icin (Geçici referans)
         entt::registry& Reg() { return m_Registry; }
 
         /**
-         * @brief Starts the physics simulation, instantiates physics bodies for all entities with RigidbodyComponent
+         * @brief Starts the physics simulation, instantiates physics bodies for all entities with Rigidbody2DComponent
          */
         void StartPhysics();
 

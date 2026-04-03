@@ -29,6 +29,8 @@ namespace BSA {
         MonoAssembly* CoreAssembly = nullptr;
         MonoImage* CoreAssemblyImage = nullptr;
 
+        std::string CoreAssemblyPath;
+
         Scene* SceneContext = nullptr;
         std::unordered_map<uint64_t, ScriptInstance> EntityInstances;
     };
@@ -75,6 +77,11 @@ namespace BSA {
     static MonoAssembly* LoadMonoAssembly(const std::string& assemblyPath) {
         uint32_t fileSize = 0;
         char* fileData = ReadBytes(assemblyPath, &fileSize);
+
+        if (!fileData) {
+            BSA_ENGINE_ERROR("Assembly dosyasi okunamadi: {0}", assemblyPath);
+            return nullptr;
+        }
 
         // NOTE: This assumes mono is already initialized
         MonoImageOpenStatus status;
@@ -186,7 +193,57 @@ namespace BSA {
         // mono_jit_cleanup doesn't work well multiple times usually, but for simple exit we can just drop the domain
     }
 
+    void ScriptEngine::ReloadAssembly() {
+        if (s_Data->CoreAssemblyPath.empty()) return;
+
+        // 1. Mevcut AppDomain'i unload et
+        if (s_Data->AppDomain && s_Data->AppDomain != s_Data->RootDomain) {
+            mono_domain_set(s_Data->RootDomain, true);
+            mono_domain_unload(s_Data->AppDomain);
+        }
+
+        // 2. Instance'lari ve GCHandle'lari temizle
+        for (auto& [id, instance] : s_Data->EntityInstances) {
+            mono_gchandle_free(instance.GCHandle);
+        }
+        s_Data->EntityInstances.clear();
+
+        // 3. Yeni AppDomain yarat
+        char appDomainName[] = "BSAEngineScriptRuntime";
+        s_Data->AppDomain = mono_domain_create_appdomain(appDomainName, nullptr);
+        mono_domain_set(s_Data->AppDomain, true);
+
+        // 4. Assembly'yi tekrar yukle
+        // NOTE: We need a version of LoadAssembly that doesn't overwrite path
+        s_Data->CoreAssembly = LoadMonoAssembly(s_Data->CoreAssemblyPath);
+        if (!s_Data->CoreAssembly) {
+            std::filesystem::path p(s_Data->CoreAssemblyPath);
+            std::string filename = p.filename().string();
+            s_Data->CoreAssembly = LoadMonoAssembly(filename);
+        }
+
+        if (s_Data->CoreAssembly) {
+            s_Data->CoreAssemblyImage = mono_assembly_get_image(s_Data->CoreAssembly);
+            BSA_ENGINE_INFO("C# Assembly Yuklendi.");
+        } else {
+            BSA_ENGINE_ERROR("C# Assembly Yuklenemedi: {0}", s_Data->CoreAssemblyPath);
+        }
+
+        // 5. Sahnede halihazirda ScriptComponent'i olan Entity'leri yeniden yarat
+        if (s_Data->SceneContext) {
+            auto view = s_Data->SceneContext->Reg().view<ScriptComponent>();
+            for (auto entityHandle : view) {
+                Entity entity{ entityHandle, s_Data->SceneContext };
+                auto& sc = entity.GetComponent<ScriptComponent>();
+                sc.Instantiated = false; // OnCreateEntity'nin tekrar cagrilmasi icin
+            }
+        }
+
+        BSA_ENGINE_INFO("C# Hot Reload Tamamlandi.");
+    }
+
     void ScriptEngine::LoadAssembly(const std::string& filepath) {
+        s_Data->CoreAssemblyPath = filepath;
         s_Data->CoreAssembly = LoadMonoAssembly(filepath);
         if (!s_Data->CoreAssembly) {
             // Eğer root'tan verildiyse (bin/Debug/Debug/...) ve EXE o klasördeyse direkt ismini dene

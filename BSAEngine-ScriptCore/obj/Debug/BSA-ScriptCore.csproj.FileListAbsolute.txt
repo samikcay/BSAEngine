@@ -1,0 +1,11 @@
+C:\Users\sami\Desktop\antigravity projeleri\BSAEngine\bin\Debug\Debug\BSA-ScriptCore.deps.json
+C:\Users\sami\Desktop\antigravity projeleri\BSAEngine\bin\Debug\Debug\BSA-ScriptCore.dll
+C:\Users\sami\Desktop\antigravity projeleri\BSAEngine\bin\Debug\Debug\BSA-ScriptCore.pdb
+C:\Users\sami\Desktop\antigravity projeleri\BSAEngine\BSAEngine-ScriptCore\obj\Debug\BSA-ScriptCore.csproj.AssemblyReference.cache
+C:\Users\sami\Desktop\antigravity projeleri\BSAEngine\BSAEngine-ScriptCore\obj\Debug\BSA-ScriptCore.GeneratedMSBuildEditorConfig.editorconfig
+C:\Users\sami\Desktop\antigravity projeleri\BSAEngine\BSAEngine-ScriptCore\obj\Debug\BSA-ScriptCore.AssemblyInfoInputs.cache
+C:\Users\sami\Desktop\antigravity projeleri\BSAEngine\BSAEngine-ScriptCore\obj\Debug\BSA-ScriptCore.AssemblyInfo.cs
+C:\Users\sami\Desktop\antigravity projeleri\BSAEngine\BSAEngine-ScriptCore\obj\Debug\BSA-ScriptCore.csproj.CoreCompileInputs.cache
+C:\Users\sami\Desktop\antigravity projeleri\BSAEngine\BSAEngine-ScriptCore\obj\Debug\BSA-ScriptCore.sourcelink.json
+C:\Users\sami\Desktop\antigravity projeleri\BSAEngine\BSAEngine-ScriptCore\obj\Debug\BSA-ScriptCore.dll
+C:\Users\sami\Desktop\antigravity projeleri\BSAEngine\BSAEngine-ScriptCore\obj\Debug\BSA-ScriptCore.pdb

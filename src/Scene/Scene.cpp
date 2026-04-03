@@ -4,7 +4,7 @@
 #include "BSAEngine/Scene/ScriptableEntity.h"
 #include "BSAEngine/Log/Log.h"
 #include "BSAEngine/Scripting/ScriptEngine.h"
-#include <glad/glad.h>
+#include "BSAEngine/Renderer/Renderer.h"
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <box2d/b2_world.h>
@@ -21,39 +21,78 @@ namespace BSA {
     // ========================================================
     class PhysicsContactListener : public b2ContactListener {
     public:
+        PhysicsContactListener(Scene* scene) : m_Scene(scene) {}
+
         void BeginContact(b2Contact* contact) override {
             b2Fixture* fixtureA = contact->GetFixtureA();
             b2Fixture* fixtureB = contact->GetFixtureB();
 
-            // Box2D'ye "User Data" olarak ECS Entity Handle'larını kaydettiğimiz varsayılıyor
-            // (Aşağıda b2BodyUserData olarak bunu atayacağız)
             entt::entity e1 = (entt::entity)fixtureA->GetBody()->GetUserData().pointer;
             entt::entity e2 = (entt::entity)fixtureB->GetBody()->GetUserData().pointer;
 
-            // İleride bu iki Entity'nin birbirine çarptığını Native Script'lere iletebiliriz
-            // Örnek:
-            // if (scene->Reg().valid(e1) && scene->Reg().all_of<NativeScriptComponent>(e1)) {
-            //      scene->Reg().get<NativeScriptComponent>(e1).Instance->OnCollisionBegin(Entity{e2, scene});
-            // }
+            NotifyScript(e1, e2, true);
+            NotifyScript(e2, e1, true);
         }
 
         void EndContact(b2Contact* contact) override {
-            // İleride Cikis anini scriptlere ilet
+            b2Fixture* fixtureA = contact->GetFixtureA();
+            b2Fixture* fixtureB = contact->GetFixtureB();
+
+            entt::entity e1 = (entt::entity)fixtureA->GetBody()->GetUserData().pointer;
+            entt::entity e2 = (entt::entity)fixtureB->GetBody()->GetUserData().pointer;
+
+            NotifyScript(e1, e2, false);
+            NotifyScript(e2, e1, false);
         }
+
+    private:
+        void NotifyScript(entt::entity self, entt::entity other, bool begin) {
+            if (!m_Scene || !m_Scene->Reg().valid(self)) return;
+
+            if (m_Scene->Reg().all_of<NativeScriptComponent>(self)) {
+                auto& nsc = m_Scene->Reg().get<NativeScriptComponent>(self);
+                if (nsc.Instance) {
+                    Entity otherEntity{ other, m_Scene };
+                    if (begin)
+                        nsc.Instance->OnCollisionBegin(otherEntity);
+                    else
+                        nsc.Instance->OnCollisionEnd(otherEntity);
+                }
+            }
+        }
+
+        Scene* m_Scene = nullptr;
     };
 
-    Scene::Scene() {}
+    static void OnNativeScriptComponentDestroy(entt::registry& registry, entt::entity entity) {
+        auto& nsc = registry.get<NativeScriptComponent>(entity);
+        if (nsc.Instance) {
+            nsc.DestroyScript(&nsc);
+        }
+    }
+
+    Scene::Scene() {
+        m_Registry.on_destroy<NativeScriptComponent>().connect<&OnNativeScriptComponentDestroy>();
+    }
 
     Scene::~Scene() {
         StopPhysics();
     }
 
     Entity Scene::CreateEntity(const std::string& name) {
+        return CreateEntityWithUUID(UUID(), name);
+    }
+
+    Entity Scene::CreateEntityWithUUID(UUID uuid, const std::string& name) {
         Entity entity = { m_Registry.create(), this };
         
-        // Her varlık varsayılan olarak bir konuma ve isme sahip olmalidir.
+        auto& id = entity.AddComponent<IDComponent>();
+        id.ID = uuid;
+
+        // Her varlık varsayılan olarak bir konuma, isme ve ilişki bileşenine sahip olmalidir.
         entity.AddComponent<TransformComponent>();
-        
+        entity.AddComponent<RelationshipComponent>();
+
         auto& tag = entity.AddComponent<TagComponent>();
         tag.Tag = name.empty() ? "Entity" : name;
 
@@ -88,14 +127,14 @@ namespace BSA {
 
     void Scene::StartPhysics() {
         m_PhysicsWorld = new b2World({ 0.0f, -9.81f });
-        m_ContactListener = new PhysicsContactListener();
+        m_ContactListener = new PhysicsContactListener(this);
         m_PhysicsWorld->SetContactListener(m_ContactListener);
 
-        auto view = m_Registry.view<RigidbodyComponent>();
+        auto view = m_Registry.view<Rigidbody2DComponent>();
         for (auto entityHandle : view) {
             Entity entity = { entityHandle, this };
             auto& transform = entity.GetComponent<TransformComponent>();
-            auto& rb = entity.GetComponent<RigidbodyComponent>();
+            auto& rb = entity.GetComponent<Rigidbody2DComponent>();
 
             b2BodyDef bodyDef;
             switch (rb.Type) {
@@ -120,8 +159,8 @@ namespace BSA {
             body->SetAngularVelocity(rb.AngularVelocity.z);
 
             // --- BOX COLLIDER 2D ---
-            if (entity.HasComponent<BoxColliderComponent>()) {
-                auto& bc = entity.GetComponent<BoxColliderComponent>();
+            if (entity.HasComponent<BoxCollider2DComponent>()) {
+                auto& bc = entity.GetComponent<BoxCollider2DComponent>();
 
                 b2PolygonShape boxShape;
                 boxShape.SetAsBox(
@@ -144,8 +183,8 @@ namespace BSA {
             }
 
             // --- SPHERE (CIRCLE) COLLIDER 2D ---
-            if (entity.HasComponent<SphereColliderComponent>()) {
-                auto& sc = entity.GetComponent<SphereColliderComponent>();
+            if (entity.HasComponent<CircleCollider2DComponent>()) {
+                auto& sc = entity.GetComponent<CircleCollider2DComponent>();
 
                 b2CircleShape circleShape;
                 circleShape.m_p.Set(sc.Offset.x, sc.Offset.y);
@@ -184,9 +223,9 @@ namespace BSA {
         m_PhysicsWorld->Step(fixedTimeStep, velocityIterations, positionIterations);
 
         // Fizik motorundan yeni pozisyonlari cekip ECS bilesenlerine yazalim
-        auto view = m_Registry.view<RigidbodyComponent, TransformComponent>();
+        auto view = m_Registry.view<Rigidbody2DComponent, TransformComponent>();
         for (auto entityHandle : view) {
-            auto [rb, transform] = view.get<RigidbodyComponent, TransformComponent>(entityHandle);
+            auto [rb, transform] = view.get<Rigidbody2DComponent, TransformComponent>(entityHandle);
             
             if (rb.Type == BodyType::Static)
                 continue;
@@ -203,7 +242,7 @@ namespace BSA {
         }
     }
 
-    void Scene::OnUpdate(float ts, std::shared_ptr<BSA::Shader> defaultShader, std::shared_ptr<BSA::VertexArray> defaultVAO) {
+    void Scene::OnUpdate(float ts, const glm::mat4& viewProjection, const glm::vec3& cameraPosition, std::shared_ptr<BSA::Shader> defaultShader, std::shared_ptr<BSA::VertexArray> defaultVAO) {
         
         // --- 1. SCRIPT ÇALIŞTIRMA MANTIĞI ---
         m_Registry.view<NativeScriptComponent>().each([=](auto entityHandle, auto& nsc) {
@@ -231,32 +270,85 @@ namespace BSA {
             }
         }
 
+        // --- 2. RENDER ÇİZİM ---
+        Renderer::BeginScene(viewProjection, cameraPosition);
+
+        // Submit Directional Lights
+        auto dirLightView = m_Registry.view<TransformComponent, DirectionalLightComponent>();
+        for (auto entityHandle : dirLightView) {
+            auto [transform, light] = dirLightView.get<TransformComponent, DirectionalLightComponent>(entityHandle);
+            glm::mat4 worldTransform = transform.GetTransform();
+            glm::vec3 direction = glm::normalize(glm::vec3(worldTransform * glm::vec4(0.0f, 0.0f, -1.0f, 0.0f)));
+            Renderer::SubmitDirectionalLight({ direction, light.Color, light.Intensity });
+        }
+        // Submit Point Lights
+        auto pointLightView = m_Registry.view<TransformComponent, PointLightComponent>();
+        for (auto entityHandle : pointLightView) {
+            auto [transform, light] = pointLightView.get<TransformComponent, PointLightComponent>(entityHandle);
+            Renderer::SubmitPointLight({ transform.Translation, light.Color, light.Intensity, light.Constant, light.Linear, light.Quadratic });
+        }
+
+        // Çizilebilir her Mesh varligini Transform matrisi eşliğinde çizdir
+        auto meshView = m_Registry.view<TransformComponent, MeshRendererComponent>();
+        for (auto entityHandle : meshView) {
+            Entity entity{ entityHandle, this };
+            auto& meshComp = entity.GetComponent<MeshRendererComponent>();
+
+            if (meshComp.Mesh) {
+                if (meshComp.Mat)
+                    meshComp.Mat->Bind();
+                else
+                    defaultShader->Bind();
+
+                Renderer::Submit(meshComp.Mat ? meshComp.Mat->GetShader() : defaultShader, meshComp.Mesh->GetVertexArray(), GetWorldTransform(entity), (int)entityHandle);
+
+            }
+        }
+        Renderer::EndScene();
+    }
+
+    void Scene::OnUpdate(float ts, std::shared_ptr<BSA::Shader> defaultShader, std::shared_ptr<BSA::VertexArray> defaultVAO) {
         // --- 2. RENDER ÇİZİM (KAMERA VE EKRAN GÜNCELLEMESİ) ---
-        BSA::PerspectiveCamera* mainCamera = nullptr;
-        // İleride ana kameranın kendi Entity position'ı da hesaba katılacak: BSA::Math::Matrix4 cameraTransform;
+        PerspectiveCamera* mainCamera = nullptr;
+        glm::vec3 mainCameraPosition = { 0.0f, 0.0f, 0.0f };
 
         auto cameraView = m_Registry.view<TransformComponent, CameraComponent>();
         for (auto entity : cameraView) {
             auto [transform, camera] = cameraView.get<TransformComponent, CameraComponent>(entity);
+            
+            // TransformComponent verilerini Camera'ya aktar
+            camera.Camera.SetPosition(transform.Translation);
+            camera.Camera.SetRotation({
+                BSA::Math::Degrees(transform.Rotation.x),
+                BSA::Math::Degrees(transform.Rotation.y),
+                BSA::Math::Degrees(transform.Rotation.z)
+            });
+
             if (camera.Primary) {
                 mainCamera = &camera.Camera;
-                // Şimdilik kameranın sadece GetViewProjectionMatrix'ini kullanıyoruz, transform bilgisini 3B uzayda atlıyoruz
-                break;
+                mainCameraPosition = transform.Translation;
+                // NOT: Şimdilik sadece ilk Primary kamerayı alıyoruz
             }
         }
 
         if (mainCamera) {
-            defaultShader->Bind();
-            defaultShader->UploadUniformMat4("u_ViewProjection", mainCamera->GetViewProjectionMatrix());
+            OnUpdate(ts, mainCamera->GetViewProjectionMatrix(), mainCameraPosition, defaultShader, defaultVAO);
+        }
+    }
 
-            // Çizilebilir her Mesh varligini Transform matrisi eşliğinde çizdir
-            auto meshView = m_Registry.view<TransformComponent, MeshRendererComponent>();
-            for (auto entityHandle : meshView) {
-                Entity entity{ entityHandle, this };
+    void Scene::OnViewportResize(uint32_t width, uint32_t height) {
+        if (width == 0 || height == 0) return;
 
-                defaultShader->UploadUniformMat4("u_Transform", GetWorldTransform(entity));
-                defaultVAO->Bind();
-                glDrawElements(GL_TRIANGLES, defaultVAO->GetIndexBuffer()->GetCount(), GL_UNSIGNED_INT, nullptr);
+        auto view = m_Registry.view<CameraComponent>();
+        for (auto entity : view) {
+            auto& cameraComponent = view.get<CameraComponent>(entity);
+            if (!cameraComponent.FixedAspectRatio) {
+                cameraComponent.Camera.SetProjection(
+                    BSA::Math::Radians(cameraComponent.FOV),
+                    (float)width / (float)height,
+                    cameraComponent.Near,
+                    cameraComponent.Far
+                );
             }
         }
     }

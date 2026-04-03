@@ -1,19 +1,29 @@
 #include "OpenGLTexture.h"
-#include "BSAEngine/Log/Log.h"
-
-#include <glad/glad.h>
-#include "stb_image.h"
+#include <stb_image.h>
 
 namespace BSA {
 
-    OpenGLTexture2D::OpenGLTexture2D(const std::string& path)
-        : m_Path(path), m_Width(0), m_Height(0)
+    OpenGLTexture2D::OpenGLTexture2D(uint32_t width, uint32_t height)
+        : m_Width(width), m_Height(height)
     {
-        // OpenGL resimerin 0,0 noktasini sol-alt olarak kabul eder, ozel araclar genelde sol-uste koyar
-        stbi_set_flip_vertically_on_load(1);
+        m_InternalFormat = GL_RGBA8;
+        m_DataFormat = GL_RGBA;
 
+        glCreateTextures(GL_TEXTURE_2D, 1, &m_RendererID);
+        glTextureStorage2D(m_RendererID, 1, m_InternalFormat, m_Width, m_Height);
+
+        glTextureParameteri(m_RendererID, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+        glTextureParameteri(m_RendererID, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+
+        glTextureParameteri(m_RendererID, GL_TEXTURE_WRAP_S, GL_REPEAT);
+        glTextureParameteri(m_RendererID, GL_TEXTURE_WRAP_T, GL_REPEAT);
+    }
+
+    OpenGLTexture2D::OpenGLTexture2D(const std::string& path)
+        : m_Path(path), m_Width(0), m_Height(0), m_RendererID(0), m_InternalFormat(0), m_DataFormat(0)
+    {
         int width, height, channels;
-        // Resim verisini RAM'e yükle
+        stbi_set_flip_vertically_on_load(1);
         stbi_uc* data = stbi_load(path.c_str(), &width, &height, &channels, 0);
 
         if (data) {
@@ -27,40 +37,45 @@ namespace BSA {
             } else if (channels == 3) {
                 internalFormat = GL_RGB8;
                 dataFormat = GL_RGB;
+            } else if (channels == 2) {
+                internalFormat = GL_RG8;
+                dataFormat = GL_RG;
+            } else if (channels == 1) {
+                internalFormat = GL_R8;
+                dataFormat = GL_RED;
             }
 
-            if (internalFormat == 0) {
-                BSA_ENGINE_ERROR("Texture formati desteklenmiyor! (Kanal sayisi: {0})", channels);
-            } else {
-                // Texture objesini olustur
-                glCreateTextures(GL_TEXTURE_2D, 1, &m_RendererID);
-                glTextureStorage2D(m_RendererID, 1, internalFormat, m_Width, m_Height);
+            m_InternalFormat = internalFormat;
+            m_DataFormat = dataFormat;
 
-                // Min/Mag filtrelerini ayarla (Linear = Yumusak/Bulanik scale, Nearest = Piksel bazli scale)
-                glTextureParameteri(m_RendererID, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-                glTextureParameteri(m_RendererID, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+            glCreateTextures(GL_TEXTURE_2D, 1, &m_RendererID);
+            glTextureStorage2D(m_RendererID, 1, internalFormat, m_Width, m_Height);
 
-                // Texture eksen tekrarlarini belirle
-                glTextureParameteri(m_RendererID, GL_TEXTURE_WRAP_S, GL_REPEAT);
-                glTextureParameteri(m_RendererID, GL_TEXTURE_WRAP_T, GL_REPEAT);
+            glTextureParameteri(m_RendererID, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+            glTextureParameteri(m_RendererID, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 
-                // RAM'deki veriyi VRAM'e (GPU bellegine) gonder
-                glTextureSubImage2D(m_RendererID, 0, 0, 0, m_Width, m_Height, dataFormat, GL_UNSIGNED_BYTE, data);
-            }
+            glTextureParameteri(m_RendererID, GL_TEXTURE_WRAP_S, GL_REPEAT);
+            glTextureParameteri(m_RendererID, GL_TEXTURE_WRAP_T, GL_REPEAT);
 
-            // RAM'den veri temizle
+            glTextureSubImage2D(m_RendererID, 0, 0, 0, m_Width, m_Height, dataFormat, GL_UNSIGNED_BYTE, data);
+            glGenerateTextureMipmap(m_RendererID);
+
             stbi_image_free(data);
-        } else {
-            BSA_ENGINE_ERROR("Texture yuklenemedi! Dosya yolu: {0}", path);
         }
     }
 
     OpenGLTexture2D::~OpenGLTexture2D() {
-        glDeleteTextures(1, &m_RendererID);
+        if (m_RendererID)
+            glDeleteTextures(1, &m_RendererID);
+    }
+
+    void OpenGLTexture2D::SetData(void* data, uint32_t size) {
+        uint32_t bpp = m_DataFormat == GL_RGBA ? 4 : 3;
+        // Check size?
+        glTextureSubImage2D(m_RendererID, 0, 0, 0, m_Width, m_Height, m_DataFormat, GL_UNSIGNED_BYTE, data);
     }
 
     void OpenGLTexture2D::Bind(uint32_t slot) const {
-        // İlgili slota (orn: 0, 1, 2) texture objesini bagla
         glBindTextureUnit(slot, m_RendererID);
     }
 

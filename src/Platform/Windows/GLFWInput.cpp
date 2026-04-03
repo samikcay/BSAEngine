@@ -1,6 +1,8 @@
 #include "GLFWInput.h"
 #include "BSAEngine/Core/Application.h"
 #include <GLFW/glfw3.h>
+#include <ostream>
+#include <string_view>
 
 namespace BSA {
 

@@ -79,5 +79,26 @@ namespace BSA {
     #define BSA_KEY_NUM_LOCK           282
     #define BSA_KEY_PRINT_SCREEN       283
     #define BSA_KEY_PAUSE              284
+    #define BSA_KEY_F1                 290
+    #define BSA_KEY_F2                 291
+    #define BSA_KEY_F3                 292
+    #define BSA_KEY_F4                 293
+    #define BSA_KEY_F5                 294
+    #define BSA_KEY_F6                 295
+    #define BSA_KEY_F7                 296
+    #define BSA_KEY_F8                 297
+    #define BSA_KEY_F9                 298
+    #define BSA_KEY_F10                299
+    #define BSA_KEY_F11                300
+    #define BSA_KEY_F12                301
+    #define BSA_KEY_LEFT_SHIFT         340
+    #define BSA_KEY_LEFT_CONTROL       341
+    #define BSA_KEY_LEFT_ALT           342
+    #define BSA_KEY_LEFT_SUPER         343
+    #define BSA_KEY_RIGHT_SHIFT        344
+    #define BSA_KEY_RIGHT_CONTROL      345
+    #define BSA_KEY_RIGHT_ALT          346
+    #define BSA_KEY_RIGHT_SUPER        347
+    #define BSA_KEY_MENU               348
 
 } // namespace BSA
